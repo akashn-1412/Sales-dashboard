@@ -2,6 +2,16 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 
+st.markdown("""
+    <style>
+    footer {visibility: hidden;}
+    </style>
+    """, unsafe_allow_html=True)
+
+# Your Streamlit app code goes here
+st.title('My Streamlit App')
+st.write('Welcome to my app!')
+
 # Function to plot visualizations
 def plot_visualizations(df):
     st.write("## Visualization Dashboard")
