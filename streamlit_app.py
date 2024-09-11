@@ -104,7 +104,12 @@ def main():
     uploaded_file = st.sidebar.file_uploader("Upload your Dataset (CSV format)", type="csv")
 
     if uploaded_file is not None:
-        df = pd.read_csv(uploaded_file)
+        # Read the CSV file with encoding handling
+        try:
+            df = pd.read_csv(uploaded_file, encoding='utf-8')
+        except UnicodeDecodeError:
+            df = pd.read_csv(uploaded_file, encoding='latin1')
+        
         st.write("### Data Preview", df.head())
 
         # Plot visualizations with filters
