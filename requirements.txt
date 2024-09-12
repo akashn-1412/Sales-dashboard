@@ -6,3 +6,5 @@ seaborn
 altair
 scikit-learn
 prophet
+pystan
+numpy
