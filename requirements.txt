@@ -7,4 +7,4 @@ altair
 scikit-learn
 prophet
 pystan
-numpy
+numpy==1.21.6
