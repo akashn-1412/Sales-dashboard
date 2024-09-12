@@ -8,3 +8,4 @@ scikit-learn
 prophet
 pystan
 numpy
+streamlit-extras
