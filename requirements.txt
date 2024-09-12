@@ -1,4 +1,7 @@
 streamlit
 pandas
 plotly
-numpy
+networkx
+seaborn
+altair
+scikit-learn
