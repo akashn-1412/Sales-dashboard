@@ -7,5 +7,7 @@ altair
 scikit-learn
 prophet
 pystan
-numpy
+numpy<2.0
 streamlit-extras
+
+
