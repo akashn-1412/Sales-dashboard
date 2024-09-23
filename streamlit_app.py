@@ -10,45 +10,223 @@ import plotly.graph_objects as go  # Import for line chart
 import plotly.figure_factory as ff
 import matplotlib.pyplot as plt
 import seaborn as sns
+import altair as alt
+import numpy as np
 import io
+import matplotlib.pyplot as plt
+from matplotlib.colors import LinearSegmentedColormap
+from datetime import datetime, timedelta
+from sklearn.metrics import mean_absolute_error, mean_absolute_percentage_error
 
 
-st.set_page_config(page_title="Sales Dashboard!!!",page_icon=":bar_chart:",layout="wide")
-st.title(":bar_chart: Sales Dashboard")
+
+st.set_page_config(page_title="Sales Dashboard!!!", page_icon=":bar_chart:", layout="wide")
+# HTML to include Font Awesome
+st.markdown(
+    """
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    """,
+    unsafe_allow_html=True
+)
+# Title with Font Awesome icon
+st.markdown(
+    """
+    <h1 style='color: #FFFFF;'>
+        <i class="fa-sharp fa-solid fa-chart-line"  style="color: white;"></i> Analytics
+        
+    </h1>
+    """,
+    unsafe_allow_html=True
+)
+#st.title(":bar_chart: Sales Dashboard")
 st.markdown('<style>div.block-container{padding-top:2rem;}</style>',unsafe_allow_html=True)
+alt.themes.enable("dark")
 
-#This code is running for a sales dataset having region, state, order date columns in it.
+# Set up session state for page navigation
+if 'page' not in st.session_state:
+    st.session_state.page = 'dashboard'  # Default to dashboard
+
+
+
+#######################
+#for .stmetric background-color: #0B1739;
+#background-color: rgba(11, 23, 57, 0.4);
+# for datasets [stmetric] background-color: #393939;
+# CSS styling
+# Inject CSS into the Streamlit app for styling
+st.markdown("""
+    <style>
+        
+        .stButton > button {
+            background-color: #0E43FB;  /* Button color */
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            width: 100%;
+            # margin-top:5px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        .sd-a{
+            margin-top: 20px;  /* Add top margin */
+        }
+    
+        .sidebar-button:hover {
+            background-color: #0B36C3; /* Darker shade on hover */
+        }
+    
+        .sidebar-container {
+            margin-top: 30px; /* Adjusts margin for the whole container */
+        }
+    
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+
+
+st.markdown("""
+<style>
+
+.stChart, .stmetric {
+        background-color: rgba(26, 47, 109, 0.4); 
+        padding: 10px;
+        border-radius: 10px;
+    }
+[data-testid="block-container"] {
+    padding-left: 0rem;
+    padding-right: 0rem;
+    padding-top: 0rem;
+    padding-bottom: 0rem;
+    margin-bottom: -7rem;/
+}
+
+[data-testid="stVerticalBlock"] {
+    padding-left: 0rem;
+    padding-right: 0rem;
+}
+
+[data-testid="stMetric"] {
+   
+    background-color: rgba(26, 47, 109, 0.4); 
+    text-align: center;
+    padding: 4px 0;
+    margin:0px;
+    border-radius: 15px;
+    animation: pulse 1.5s infinite; /* Subtle pulse animation */
+}
+
+[data-testid="stMetricLabel"] {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin:0px;
+}
+
+[data-testid="stMetricDeltaIcon-Up"] {
+    position: relative;
+    left: 38%;
+    -webkit-transform: translateX(-50%);
+    -ms-transform: translateX(-50%);
+    transform: translateX(-50%);
+}
+
+[data-testid="stMetricDeltaIcon-Down"] {
+    position: relative;
+    left: 38%;
+    -webkit-transform: translateX(-50%);
+    -ms-transform: translateX(-50%);
+    transform: translateX(-50%);
+}
+
+/* Animation */
+[data-testid="stMetric"] {
+    animation: pulse 1.5s infinite; /* Subtle pulsing animation */
+}
+
+</style>
+""", unsafe_allow_html=True)
+
+###End of css style
+
+#In order to create the custom css for metric
+def custom_metric(label, value, percentage_change, icon_color="#CB3CFF", label_color="#CB3CFF"):
+    # Determine the color for the percentage change
+    change_color = "#CB3CFF" if percentage_change >= 0 else "#FF3C3C"
+    
+    # Create HTML with the specified colors
+    st.markdown(f"""
+    <div style="background-color:#0B1739; padding:10px; border-radius:10px; text-align:left; display: flex; align-items: center;">
+        <div style="flex: 1;">
+            <h3 style="color:#fafafa;">{value}</h3>
+            <p style="color:{label_color}; font-size:18px;">
+                <span style="color:{icon_color}; font-size:20px;">{label[:1]}</span>{label[1:]}
+            </p>
+        </div>
+        <div style="flex-shrink: 0; margin-left: 20px;">
+            <p style="color:{change_color}; font-size:16px;">
+                {percentage_change:.2f}%
+            </p>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+
+# Helper function to format large numbers
+def format_number(value):
+    if value >= 1_000_000_000:
+        return f"{value / 1_000_000_000:.2f}B"
+    elif value >= 1_000_000:
+        return f"{value / 1_000_000:.2f}M"
+    elif value >= 1_000:
+        return f"{value / 1_000:.2f}K"
+    else:
+        return f"{int(value)}"
+
+
+
+
+
 def parse_dates(df, date_column):
     date_formats = [
         #added more date format
 
-        '%m-%d-%Y', '%d-%m-%Y', '%Y-%m-%d', '%d-%m-%y', '%m/%d/%Y',
-        '%Y-%m-%d %H:%M:%S', '%d/%m/%Y %H:%M:%S', '%d-%m-%Y %H:%M:%S',
-        '%d-%m-%Y', '%d/%m/%Y', '%Y/%m/%d',
-        '%Y-%m-%dT%H:%M:%S', '%Y-%m-%dT%H:%M:%SZ',  # ISO 8601
+        #'%m-%d-%Y', '%d-%m-%Y', '%Y-%m-%d', '%d-%m-%y', '%m/%d/%Y',
+        #'%Y-%m-%d %H:%M:%S', '%d/%m/%Y %H:%M:%S', '%d-%m-%Y %H:%M:%S',
+        #'%d-%m-%Y', '%d/%m/%Y', '%Y/%m/%d',
+        #'%Y-%m-%dT%H:%M:%S', '%Y-%m-%dT%H:%M:%SZ',  # ISO 8601
+        #'%d %B %Y', '%d %b %Y',  # Full and abbreviated month names
+        #'%a, %d %b %Y',  # Weekday with date
+        #'%m-%d-%Y %I:%M %p', '%m/%d/%Y %I:%M %p'  # 12-hour format with AM/PM
+
+        #changed some format
+
+        '%d-%m-%Y', '%d/%m/%Y',  # Day-first formats
+        '%m-%d-%Y', '%m/%d/%Y',  # Month-first formats
+        '%Y-%m-%d', '%Y/%m/%d',  # ISO formats
+        '%Y-%m-%d %H:%M:%S', '%Y-%m-%dT%H:%M:%S',  # ISO 8601 with time
         '%d %B %Y', '%d %b %Y',  # Full and abbreviated month names
         '%a, %d %b %Y',  # Weekday with date
         '%m-%d-%Y %I:%M %p', '%m/%d/%Y %I:%M %p'  # 12-hour format with AM/PM
+
+
+
 
     ]
     
     for fmt in date_formats:
         try:
-            return pd.to_datetime(df[date_column], format=fmt, dayfirst=fmt.startswith('%d'))
+            return pd.to_datetime(df[date_column], format=fmt, dayfirst=fmt.startswith('%d'),errors='coerce')
         except ValueError:
             continue
-    
-    # If no formats match, try default parsing
-    #return pd.to_datetime(df[date_column], errors='coerce')  errors='coerce'
+    return(None)
 
-
-# File uploader
-fl = st.file_uploader(":file_folder: Upload a file", type=(["csv","txt","xlsx","xls"]))
-st.warning("Please Upload a sales datasets only having Profit , Order Date, Category ,Region.")
+st.sidebar.header(" :file_folder: Upload your datasets")
+fl = st.sidebar.file_uploader(" ", type=(["csv", "txt", "xlsx", "xls"]))
 
 if fl is not None:
-    st.write(fl.name)  # Show the name of the uploaded file
-    
     # Check the file extension to determine how to read it
     if fl.name.endswith('.csv'):
         df = pd.read_csv(fl, encoding='latin1')
@@ -60,338 +238,661 @@ if fl is not None:
         st.error("Unsupported file type. Please upload a valid file.")
         df = None  # Set df to None if no valid file is uploaded
 
-    if df is not None:
+    ##if df is not None:
+    if 'Order Date' in df.columns:
         # Ensure proper date parsing and remove rows with NaT in 'Order Date'
         df["Order Date"] = pd.to_datetime(df["Order Date"], errors='coerce')
+        #df["Order Date"] = pd.to_datetime(df["Order Date"])
+        ##df["Order Date"] = parse_dates(df, "Order Date")
+        #st.write(df["Order Date"].head())
+
         df = df.dropna(subset=["Order Date"])
+        ##if 'Order Date' in df.columns:
+        ##df["Order Date"] = pd.to_datetime(df["Order Date"], errors='coerce')  # Parse dates
+        # Drop rows with NaT in 'Order Date'
+        ##df = df.dropna(subset=["Order Date"])
 
-        # Continue with your existing processing and visualization
-        st.write(df.head())  # Display a preview of the data
-    # Parse 'Order Date' into datetime format, allowing flexibility for different formats
-    #df["Order Date"] = pd.to_datetime(df["Order Date"], errors='coerce')
+        # Create 'Order Year' and 'Order Month' columns if not present
+        df['Order Year'] = df['Order Date'].dt.year
+        ##df['Order Month'] = df['Order Date'].dt.month  # Extract month for use
+        df['Month'] = df['Order Date'].dt.month  # Extract month for use
 
-    # Drop rows with NaT in 'Order Date' to prevent errors
-    #df = df.dropna(subset=["Order Date"])
-    # extra code for kpi 
 
+
+        # Create or modify columns safely
+        if 'Order Year' not in df.columns:
+            df['Order Year'] = df['Order Date'].dt.year
+
+        # Filter by year
+        st.sidebar.subheader("Choose your filter")
+        year_list = sorted(list(df['Order Year'].unique()), reverse=True)
+        selected_year = st.sidebar.selectbox("Select a year", year_list)
+
+        # Filter the DataFrame by the selected year
+        df_selected_year = df[df['Order Year'] == selected_year].copy()
+
+        # Filter by country (only show countries from the selected year data)
+        Country = st.sidebar.multiselect("Pick the Country", df_selected_year["Country"].unique())
+
+        if not Country:
+            filtered_df = df_selected_year.copy()  # If no country is selected, show data for all countries
+        else:
+            filtered_df = df_selected_year[df_selected_year["Country"].isin(Country)]  # Filter by selected countries
+        
+        #color_theme_list = ['blues', 'cividis', 'greens', 'inferno', 'magma', 'plasma', 'reds', 'rainbow', 'turbo', 'viridis']
+        #selected_color_theme = st.sidebar.selectbox('Select a color theme', color_theme_list)
+        # Sidebar menu with styled button
+        with st.sidebar:
+            # Create a div container for the button to simulate margin and styling
+            st.markdown('<div class="sidebar-container ">', unsafe_allow_html=True)
+
+            # Add custom styled button using HTML
+            # The custom button itself does nothing here
     
-    #col1, col2 = st.columns((2))
-
-    # Getting the max and min date from the given data
-    #startDate = pd.to_datetime(df["Order Date"]).min()
-    #endDate = pd.to_datetime(df["Order Date"]).max()
-
-    #with col1:
-        #date1 = pd.to_datetime(st.date_input("Start Date", startDate))
-
-    #with col2:
-        #date2 = pd.to_datetime(st.date_input("End Date", endDate))
-
-    #df = df[(df["Order Date"] >= date1) & (df["Order Date"] <= date2)].copy()
-
-    # Sidebar filters
-    st.sidebar.header("Choose your filter")
-    #Filter by dates
-    startDate = pd.to_datetime(df["Order Date"]).min()
-    endDate = pd.to_datetime(df["Order Date"]).max()
-    date1 = pd.to_datetime(st.sidebar.date_input("Start Date", startDate))
-    date2 = pd.to_datetime(st.sidebar.date_input("End Date", endDate))
-    df = df[(df["Order Date"] >= date1) & (df["Order Date"] <= date2)].copy()
-
-
-
-
-    # Filter by region
-    region = st.sidebar.multiselect("Pick your region", df['Region'].unique())
-    if not region:
-        df2 = df.copy()
-    else:
-        df2 = df[df["Region"].isin(region)]
+            # Create the button with custom class for styling
+            #if st.markdown('<button class="sidebar-button sd-a">Data Preview</button>', unsafe_allow_html=True):
+            if st.button('Data Preview'):
+                st.session_state.page = 'data_preview'
+                #st.experimental_rerun() 
     
-    # Filter by state
-    state = st.sidebar.multiselect("Pick the state", df2["State"].unique())
-    if not state:
-       df3 = df2.copy()
-    else:
-       df3 = df2[df2["State"].isin(state)]
+            st.markdown('</div>', unsafe_allow_html=True)
+            st.markdown('<div class="sidebar-container ">', unsafe_allow_html=True)
+
+
+            # Add custom styled button using HTML
+            
+            # Create the button with custom class for styling
+            #if st.markdown('<button class="sidebar-button">Dashboard</button>', unsafe_allow_html=True):
+            if st.button('Dashboard'):
+                st.session_state.page = 'dashboard'
     
-    # Filter by city
-    city = st.sidebar.multiselect("Pick the city", df3["City"].unique())
+            st.markdown('</div>', unsafe_allow_html=True)
 
-    # Final filtering based on selected region, state, and city
-    if not region and not state and not city:
-        filtered_df = df
-    elif not state and not city:
-        filtered_df = df[df["Region"].isin(region)]
-    elif not region and not city:
-        filtered_df = df[df["State"].isin(state)]
-    elif state and city:
-        filtered_df = df3[df["State"].isin(state) & df3["City"].isin(city)]
-    elif region and city:
-        filtered_df = df3[df["Region"].isin(region) & df3["City"].isin(city)]
-    elif region and state:
-        filtered_df = df3[df["Region"].isin(region) & df3["State"].isin(state)]
-    elif city:
-        filtered_df = df3[df3["City"].isin(city)]
-    else:
-        filtered_df = df3[df3["Region"].isin(region) & df3["State"].isin(state) & df3["City"].isin(city)]
+        # Main content based on page navigation
+        if st.session_state.page == 'data_preview':
+            st.title("Data Preview")
+            st.dataframe(df,height=1000)
+            # Custom color map with your theme colors
+            colors = ["#00C2FF", "#0E43FB", "#C97DD7"]
+            cmap_custom = LinearSegmentedColormap.from_list("custom_theme", colors)
+            col1,col2=st.columns((1,1),gap="medium")
+            # Custom CSS to expand the table width
+            css = """
+                <style>
+                    .dataframe tbody tr th:only-of-type {
+                        vertical-align: middle;
+                    }
+                    .dataframe tbody tr td {
+                        text-align: center;
+                    }
+                    .dataframe thead th {
+                        text-align: center;
+                    }
+                    .dataframe {
+                        width: 80% !important; /* Adjust this value to control the table width */
+                        margin: auto;
+                    }
+                </style>
+            """
+
+            with col1:
+                st.subheader("Category Wise Sales Data ")
+                category_df = filtered_df.groupby(by=['Category'], as_index=False)["Sales"].sum()
+                # Apply custom color gradient based on your theme
+                #styled_category_df = category_df.style.background_gradient(cmap=cmap_custom)
+                #st.dataframe(category_df.style.background_gradient(cmap=cmap_custom), width=1200,height=170)  # Adjust width as needed
+                st.dataframe(category_df, width=1200,height=170)  # Adjust width as needed
+                 
+            with col2: 
+                st.subheader("Region Wise Sales Data")
+                region_sales = filtered_df.groupby(by="Region", as_index=False)["Sales"].sum()
+                #styled_region_sales = region_sales.style.background_gradient(cmap=cmap_custom)
+                # Display dataframe with adjustable width
+                #st.dataframe(region_sales.style.background_gradient(cmap=cmap_custom), width=1000)  # Adjust width as needed
+                st.dataframe(region_sales, width=1000)  # Adjust width as needed
     
-    # extra code for kpi 
-    # Calculate KPIs
-    total_sales = filtered_df["Sales"].sum()
-    total_orders = filtered_df.shape[0]
-    total_profit = filtered_df["Profit"].sum()
-
-    # Display KPIs in a box
-    st.subheader("Key Performance Indicators")
-    kpi_col1, kpi_col2, kpi_col3 = st.columns(3)
-    kpi_col1.metric(label=" ⏱ Total Sales", value=f"${total_sales:,.2f}")
-    kpi_col2.metric(label=" ⏱ Total Orders", value=f"{total_orders:,}")
-    kpi_col3.metric(label="⏱ Total Profit", value=f"${total_profit:,.2f}")
-    style_metric_cards(background_color="#e0f7fa",border_left_color="#FF4B4B",border_color="#1f66bd",box_shadow="#F71938")
-
-
-    # Category wise Sales
-    category_df = filtered_df.groupby(by=['Category'], as_index=False)["Sales"].sum()
-
-    col1,col2=st.columns(2)
+            # Define columns with equal width
+            col1 = st.columns([1])[0]  
+            with col1:
+                st.subheader("Month-wise Sub-Category Table")
     
-    with col1:
-        st.subheader("Category wise Sales")
-        fig = px.bar(category_df, x="Category", y="Sales", text=['${:,.2f}'.format(x) for x in category_df["Sales"]], template="seaborn")
-        st.plotly_chart(fig, use_container_width=True, height=200)
-
-    with col2:
-        st.subheader("Region wise Sales")
-        fig = px.pie(filtered_df, values="Sales", names="Region", hole=0.5)
-        fig.update_traces(text=filtered_df["Region"], textposition="outside")
-        st.plotly_chart(fig, use_container_width=True)
-
-    # View data and download options
-    cl1, cl2 = st.columns(2)
-    with cl1:
-        with st.expander("Category_ViewData"):
-            st.write(category_df.style.background_gradient(cmap="Blues"))
-            csv = category_df.to_csv(index=False).encode('utf-8')
-            st.download_button("Download Data", data=csv, file_name="Category.csv", mime="Text/csv")
-
-    with cl2:
-        with st.expander("Region_ViewData"):
-            region_sales = filtered_df.groupby(by="Region", as_index=False)["Sales"].sum()
-            st.write(region_sales.style.background_gradient(cmap="Oranges"))
-            csv = region_sales.to_csv(index=False).encode('utf-8')
-            st.download_button("Download Data", data=csv, file_name="Region.csv", mime="text/csv")
-
-    # Time Series Analysis
-    filtered_df["month_year"] = filtered_df["Order Date"].dt.to_period("M")
-    st.subheader('Time Series Analysis')
-    linechart = pd.DataFrame(filtered_df.groupby(filtered_df["month_year"].dt.strftime("%Y : %b"))["Sales"].sum()).reset_index()
-    fig2 = px.line(linechart, x="month_year", y="Sales", labels={"Sales": "Amount"}, height=500, width=1000, template="gridon")
-    st.plotly_chart(fig2, use_container_width=True)
-
-    with st.expander("View Data of TimeSeries:"):
-        st.write(linechart.T.style.background_gradient(cmap="Blues"))
-        csv = linechart.to_csv(index=False).encode("utf-8")
-        st.download_button('Download Data', data=csv, file_name="TimeSeries.csv", mime='text/csv')
-
-    # Tree map
-    st.subheader("Hierarchial View of Sales Using Tree Map")
-    fig3 = px.treemap(filtered_df, path=["Region", "Category", "Sub-Category"], values="Sales", hover_data=["Sales"], color="Sub-Category")
-    fig3.update_layout(width=800, height=650)
-    st.plotly_chart(fig3, use_container_width=True)
-
-    # Segment wise sales and category wise sales
-    chart1, chart2 = st.columns(2)
-    with chart1:
-        st.subheader('Segment wise Sales')
-        fig = px.pie(filtered_df, values="Sales", names="Segment", template="plotly_dark")
-        fig.update_traces(text=filtered_df["Segment"], textposition="inside")
-        st.plotly_chart(fig, use_container_width=True)
-
-    with chart2:
-        #st.subheader('Sales Distribution for Region/Sales')
-        #fig = px.pie(filtered_df, values="Sales", names="Category", template="gridon")
-        #fig.update_traces(text=filtered_df["Category"], textposition="inside")
-        #st.plotly_chart(fig, use_container_width=True)
-        #fig_distribution = px.violin(filtered_df, y='Sales', x='Category', color='Category', box=True,
-                             #title='Sales Distribution by Category')
-        #st.plotly_chart(fig_distribution, use_container_width=True)
-        # Create a slider for users to choose the number of top products
-        top_n = st.slider('Select number of top products to display', min_value=1, max_value=50, value=10, step=1)
-
-        # Compute the top products based on the selected number
-        top_products = filtered_df.groupby('Product Name')['Sales'].sum().nlargest(top_n).reset_index()
-
-        # Create a bar chart for the top products
-        fig_top_products = px.bar(top_products, x='Product Name', y='Sales', title=f'Top {top_n} Products by Sales')
-
-        # Display the chart
-        st.plotly_chart(fig_top_products, use_container_width=True)
+                # Prepare filtered data for the month-wise sub-category table
+                filtered_df["month"] = filtered_df["Order Date"].dt.month_name()
+                sub_category_Year = pd.pivot_table(data=filtered_df, values="Sales", index=["Sub-Category"], columns="month")
+                # Fill NaN values with 0 or any default value
+                sub_category_Year = sub_category_Year.fillna(0)
+                # Custom CSS to apply theme colors to DataFrame styling         
+                st.dataframe(sub_category_Year,width=3000)
 
 
-
-    # Summary Table
-    st.subheader(":point_right: Month wise Sub-Category Sales Summary")
-    with st.expander("Summary_Table"):
-        df_sample = df[0:5][["Region", "State", "City", "Category", "Sales", "Profit", "Quantity"]]
-        fig = ff.create_table(df_sample, colorscale="Cividis")
-        st.plotly_chart(fig, use_container_width=True)
-
-        st.markdown("Month wise sub-Category Table")
-        filtered_df["month"] = filtered_df["Order Date"].dt.month_name()
-        sub_category_Year = pd.pivot_table(data=filtered_df, values="Sales", index=["Sub-Category"], columns="month")
-        st.write(sub_category_Year.style.background_gradient(cmap="Blues"))
-
-    # Scatter plot for Sales vs Profit
-    st.subheader("Relationship between Sales and Profits")
-    data1 = px.scatter(filtered_df, x="Sales", y="Profit", size="Quantity")
-    data1['layout'].update(title="Relationship between Sales and Profits using Scatter Plot.",
-                           titlefont=dict(size=20), xaxis=dict(title="Sales", titlefont=dict(size=16)),
-                           yaxis=dict(title="Profit", titlefont=dict(size=16)))
-    st.plotly_chart(data1, use_container_width=True)
+        elif st.session_state.page == 'dashboard':
+            #New code ---
+            col=st.columns((2,2,2,2),gap='small')
+            total_sales = filtered_df["Sales"].sum()
+            #total_sales = df["Sales"].sum()
+            total_orders = filtered_df.shape[0]
+            #total_orders = df.shape[0]
+            total_profit = filtered_df["Profit"].sum()
+            #total_profit = df["Profit"].sum()
 
 
-
-
-
-
-    #Extra Code for sales forecasting 
-    import plotly.graph_objects as go  # Import for line chart
-
-    # Prepare data for Prophet
-    forecast_df = filtered_df.groupby("Order Date").agg({"Sales": "sum"}).reset_index()
-    forecast_df.rename(columns={"Order Date": "ds", "Sales": "y"}, inplace=True)
-
-    # Fit the Prophet model
-    model = Prophet()
-    model.fit(forecast_df)
-
-    # Make future dataframe (e.g., forecast for the next 30 days)
-    future = model.make_future_dataframe(periods=30)  # Forecast for 0 days
-    forecast = model.predict(future)
-
-    # Create a line plot for actual sales and predicted sales
-    fig = go.Figure()
-
-    # Add actual sales line
-    fig.add_trace(go.Scatter(x=forecast_df['ds'], y=forecast_df['y'], mode='lines', name='Actual Sales'))
-
-    # Add predicted sales line
-    fig.add_trace(go.Scatter(x=forecast['ds'], y=forecast['yhat'], mode='lines', name='Predicted Sales'))
-
-    # Add lower and upper confidence interval for forecast
-    fig.add_trace(go.Scatter(x=forecast['ds'], y=forecast['yhat_lower'], fill=None, mode='lines',
-                         line=dict(color='lightgrey'), showlegend=False, name='Lower Bound'))
-    fig.add_trace(go.Scatter(x=forecast['ds'], y=forecast['yhat_upper'], fill='tonexty', mode='lines',
-                         line=dict(color='lightgrey'), showlegend=False, name='Upper Bound'))
-
-    # Update layout
-    fig.update_layout(title="Sales Forecast",
-                  xaxis_title="Date",
-                  yaxis_title="Sales",
-                  template="plotly_white")
-
-    # Show plot in Streamlit
-    st.plotly_chart(fig, use_container_width=True)
-
-
-    # Add a button to navigate to another page
-    col1,col2=st.columns(2)
-    with col1:
-        if st.button("Visualize More"):
-            st.write("### Visualizations of the filtered data")
-            # Add your visualization code here
-            #st.line_chart(df_filtered["Sales"])
-            # Upload CSV file
-            uploaded_file = st.file_uploader("Upload your Dataset (CSV format)", type="csv")
-
-            # If a file is uploaded
-            if uploaded_file is not None:
-                df = load_data(uploaded_file)
-                # Select the type of plot
-                st.write("### Select Visualization Type:")
-                chart_type = st.selectbox("Choose the chart type", [
-                  "Bar Chart", "Line Chart", "Scatter Plot", "Heatmap", "Area Chart", 
-                  "Pie Chart", "Histogram", "Box Plot", "Violin Plot", "Pair Plot", 
-                  "Density Plot", "Geographical Map"
-                ])
-
-                if chart_type in ["Bar Chart", "Line Chart", "Scatter Plot", "Area Chart"]:
-                    st.write("### Select Columns for Plot:")
-                    x_col = st.selectbox("Choose X-axis", df.columns)
-                    y_col = st.selectbox("Choose Y-axis", df.columns)
-                    color = st.color_picker("Pick a color", "#1f77b4")
-                    if st.button(f"Generate {chart_type}"):
-                       buf = generate_plot(chart_type, x_col, y_col, color)
-                       st.image(buf, use_column_width=True)
-                       st.download_button("Download Plot", buf, "plot.png", "image/png")
-
-                elif chart_type == "Heatmap":
-                    if st.button("Generate Heatmap"):
-                       buf = generate_plot(chart_type, None, None, None)
-                       st.image(buf, use_column_width=True)
-                       st.download_button("Download Heatmap", buf, "heatmap.png", "image/png")
-
-                elif chart_type == "Pie Chart":
-                    st.write("### Select Column for Pie Chart:")
-                    col = st.selectbox("Choose a Column", df.columns)
-                    if st.button("Generate Pie Chart"):
-                      buf = generate_plot(chart_type, None, None, None)
-                      st.image(buf, use_column_width=True)
-                      st.download_button("Download Pie Chart", buf, "pie_chart.png", "image/png")
-
-                elif chart_type == "Histogram":
-                    st.write("### Select Column for Histogram:")
-                    col = st.selectbox("Choose a Column", df.columns)
-                    bins = st.slider("Select number of bins", min_value=10, max_value=100, value=20)
-                    if st.button("Generate Histogram"):
-                       buf = generate_plot(chart_type, None, None, None, bins)
-                       st.image(buf, use_column_width=True)
-                       st.download_button("Download Histogram", buf, "histogram.png", "image/png")
-
-                elif chart_type == "Box Plot":
-                    st.write("### Select Column for Box Plot:")
-                    col = st.selectbox("Choose a Column", df.columns)
-                    if st.button("Generate Box Plot"):
-                        buf = generate_plot(chart_type, None, None, None)
-                        st.image(buf, use_column_width=True)
-                        st.download_button("Download Box Plot", buf, "box_plot.png", "image/png")
-
-                elif chart_type == "Violin Plot":
-                    st.write("### Select Column for Violin Plot:")
-                    col = st.selectbox("Choose a Column", df.columns)
-                    if st.button("Generate Violin Plot"):
-                        buf = generate_plot(chart_type, None, None, None)
-                        st.image(buf, use_column_width=True)
-                        st.download_button("Download Violin Plot", buf, "violin_plot.png", "image/png")
-                elif chart_type == "Pair Plot":
-                    st.write("### Generating Pair Plot for Numerical Data:")
-                    if st.button("Generate Pair Plot"):
-                        buf = generate_plot(chart_type, None, None, None)
-                        st.image(buf, use_column_width=True)
-                        st.download_button("Download Pair Plot", buf, "pair_plot.png", "image/png")
-                
-
-                elif chart_type == "Density Plot":
-                    st.write("### Select Column for Density Plot:")
-                    col = st.selectbox("Choose a Column", df.columns)
-                    color = st.color_picker("Pick a color", "#1f77b4")
-                    if st.button("Generate Density Plot"):
-                        buf = generate_plot(chart_type, None, None, color)
-                        st.image(buf, use_column_width=True)
-                        st.download_button("Download Density Plot", buf, "density_plot.png", "image/png")
-
-                elif chart_type == "Geographical Map":
-                    st.write("### Geographical Map:")
-                    st.map(df)
-
+            # Calculate Profit Margin Percentage
+            if total_sales != 0:  # To avoid division by zero error
+                profit_margin_percentage = (total_profit / total_sales) * 100
             else:
-                st.write("Please upload a CSV file to visualize the data.")
+                profit_margin_percentage = 0
+
+            #for kpi like 
+            # Calculate the number of unique customers
+            total_customers = filtered_df["Customer Name"].nunique()
+            # Calculate Order Frequency (Number of Orders / Total Customers)
+            if total_customers != 0:  # To avoid division by zero
+                order_frequency = total_orders / total_customers
+            else:
+                order_frequency = 0
+
+
+            #Get current date
+            today = datetime.today()
+            # Get the latest date in the dataset
+            max_date = df['Order Date'].max()
+
+            # Define current period (e.g., current month)
+            current_period_start = max_date.replace(day=1)  # First day of the current month
+            next_month = (current_period_start + pd.DateOffset(months=1)).replace(day=1)  # First day of the next month
+            current_period_end = next_month - pd.DateOffset(days=1)  # Last day of the current month
+
+            # Define previous period based on the current period
+            previous_month_start = (current_period_start - pd.DateOffset(months=1)).replace(day=1)
+            previous_month_end = current_period_start - pd.DateOffset(days=1)
+        
+        
+            # Convert to datetime
+            current_period_start = pd.to_datetime(current_period_start)
+            current_period_end = pd.to_datetime(current_period_end)
+            previous_month_start = pd.to_datetime(previous_month_start)
+            previous_month_end = pd.to_datetime(previous_month_end)
+
+            # Filter data for current and previous periods
+            current_period_df = df[(df['Order Date'] >= current_period_start) & (df['Order Date'] <= current_period_end)]
+            previous_period_df = df[(df['Order Date'] >= previous_month_start) & (df['Order Date'] <= previous_month_end)]
+       
+            # Calculate metrics for current period
+            current_total_sales = current_period_df['Sales'].sum()
+            current_total_profit = current_period_df['Profit'].sum()
+            current_profit_margin = (current_total_profit / current_total_sales) * 100 if current_total_sales != 0 else 0
+
+            # Calculate metrics for previous period
+            previous_total_sales = previous_period_df['Sales'].sum()
+            previous_total_profit = previous_period_df['Profit'].sum()
+            previous_profit_margin = (previous_total_profit / previous_total_sales) * 100 if previous_total_sales != 0 else 0
+            # Calculate order frequencies
+            current_orders = current_period_df.shape[0]
+            current_customers = current_period_df['Customer Name'].nunique()
+            current_order_frequency = current_orders / current_customers if current_customers != 0 else 0
+
+            previous_orders = previous_period_df.shape[0]
+            previous_customers = previous_period_df['Customer Name'].nunique()
+            previous_order_frequency = previous_orders / previous_customers if previous_customers != 0 else 0
 
 
 
 
-    with col2:
-        # Download orginal DataSet
-        csv = df.to_csv(index = False).encode('utf-8')
-        st.download_button('Download Data', data = csv, file_name = "Data.csv",mime = "text/csv")
+            # Calculate percentage changes
+            sales_change = ((current_total_sales - previous_total_sales) / previous_total_sales) * 100 if previous_total_sales != 0 else 0
+            profit_change = ((current_total_profit - previous_total_profit) / previous_total_profit) * 100 if previous_total_profit != 0 else 0
+            profit_margin_change = current_profit_margin - previous_profit_margin
+            order_frequency_change = ((current_order_frequency - previous_order_frequency) / previous_order_frequency) * 100 if previous_order_frequency != 0 else 0
+
+
+            # Calculate percentage change
+            if previous_order_frequency != 0:
+                order_frequency_change = ((current_order_frequency - previous_order_frequency) / previous_order_frequency) * 100
+            else:
+                order_frequency_change = 0
+
+            #checking for data filtering 
+            # Displaying all KPIs inside col[0]
+            with col[0]:
+                #custom_metric(value=f"{format_number(total_sales)}", label=" 📈  Total Sales")
+                custom_metric("📈 Current Sales", f"{format_number(current_total_sales)}", sales_change)
+            
+
+            with col[1]:
+                #custom_metric(value=f"{format_number(total_orders)}", label="📦 Total Order")
+                #custom_metric("🔄 Order Frequency", f"{order_frequency:.2f}")
+                custom_metric(
+                    "💵 Current Profit", 
+                    f"{format_number(current_total_profit)}", 
+                    profit_change, 
+                    icon_color="#FF6347",  # Tomato for the icon
+                    label_color="#1E90FF"  # Dodger Blue for the label
+                )
+
+            with col[2]:
+                #custom_metric(value=f"{format_number(total_profit)}", label="💰 Total Profit")
+                custom_metric(
+                    "🔄 Order Frequency", 
+                    f"{current_order_frequency:.2f}", 
+                    order_frequency_change, 
+                    icon_color="#FF1493",  # Deep Pink for the icon
+                    label_color="#00BFFF"  # Deep Sky Blue for the label
+                )
+
+            with col[3]:
+                # Adding KPI for Profit Margin Percentage
+                #custom_metric(value=f"{profit_margin_percentage:.2f}%", label="📊 Profit Margin")
+                custom_metric(
+                    "📊 Profit Margin", 
+                    #f"{current_profit_margin:.2f}%", 
+                    f"{current_profit_margin:.2f}%", 
+                    profit_margin_change, 
+                    icon_color="#FFD700",  # Gold for the icon
+                    label_color="#ADFF2F"  # Green Yellow for the label
+                )
+
+            # Add a gap using st.markdown()
+            st.markdown("<br>", unsafe_allow_html=True)  # Adds vertical space between sections
+            col=st.columns((3,5),gap='medium')
+            with col[0]:
+                # Group by Category and sum Sales
+                category_df = filtered_df.groupby(by=['Category'], as_index=False)["Sales"].sum()
+                # Calculate the total sales
+                total_sales = category_df['Sales'].sum()
+
+                # Calculate percentages
+                category_df['Percentage'] = (category_df['Sales'] / total_sales) * 100
+
+
+                # Define colors
+                ring_colours = ['#CB3CFF', '#0E43FB', '#00C2FF']
+
+                # Create a pie chart with Plotly Express
+                fig = px.pie(
+                    category_df,
+                    values="Sales",
+                    names="Category",
+                    hole=0.7,
+                    color_discrete_sequence=ring_colours  # Use the custom color sequence
+                )
+
+                # Update pie chart traces
+                fig.update_traces(
+                    textinfo='label',  # Show both label and percentage
+                    textposition='inside',  # Place text inside the slices
+                    pull=[0, 0, 0],  # Slightly pull the first slice for emphasis (optional)
+                    marker=dict(
+                        line=dict(color='rgba(255, 255, 255, 0.3)', width=1),  # White border around slices
+                    )
+                )
+                # Calculate the total sales and top category for central text
+                total_sales = filtered_df['Sales'].sum()
+                top_category = filtered_df.loc[filtered_df['Sales'].idxmax(), 'Category']
+                top_sales = filtered_df['Sales'].max()
+
+
+                #Update annoatation
+                # Add annotations
+            
+
+                # Update layout
+                fig.update_layout(
+                    #height=400,
+                    height=400,
+                    title={
+                        'text': "Sales by Category",
+                        'y':0.9,
+                        'x':0.1,
+                        'xanchor': 'left',
+                        'yanchor': 'top',
+                        'font': dict(
+                            family='Montserrat, sans-serif',
+                            size=19,
+                            color='#D3D3D3',  # Light gray text
+                        ),
+                    },
+                    paper_bgcolor="#0B1739",  # Dark background color
+                    plot_bgcolor="#0B1739",  # Dark background color for the plot area
+                    margin=dict(l=0, r=0, t=70, b=80),  # Adjust margins to fit the column
+                    showlegend=True,  # Hide the legend
+                    legend=dict(
+                        orientation="h",  # Horizontal legend
+                        yanchor="bottom",
+                        y=-0.3,  # Position the legend below the chart
+                        xanchor="left",
+
+                        x=0.1,  # Position the legend to the left
+                        font=dict(color='#D3D3D3'),  # Light gray for legend text
+                    ),  
+                    font=dict(color='#D3D3D3'),  # Light gray for all text
+                )
+                # Adding glow effect to chart elements (lines and slices)
+                fig.update_traces(marker_line=dict(width=2, color='rgba(255, 255, 255, 0.3)'), selector=dict(type='pie'))
+
+                # Apply hover effect styling
+                fig.update_traces(
+                    hoverinfo="label+percent+value",  # Display more info on hover
+                    hoverlabel=dict(
+                        font_size=12,
+                        font_family="Montserrat, sans-serif"
+                    )
+                )
+                # Display the pie chart
+                st.plotly_chart(fig, use_container_width=True)
+                #Extra code for this 
+                #Compute the total sales for each product
+                top_products = filtered_df.groupby('Product Name')['Sales'].sum().reset_index()
+                # To show top 3 products
+                top_products_sorted = top_products.sort_values(by='Sales', ascending=False).head(3)
+                # Calculate the total sales for percentage calculation
+                total_sales = top_products_sorted['Sales'].sum()    
+
+                # Calculate percentage sales and add it as a new column
+                top_products_sorted['Percentage'] = (top_products_sorted['Sales'] / total_sales * 100).round(2)
+            
+                # Truncate product names to a maximum of 2 words
+                def truncate_product_name(name, max_words=2):
+                    words = name.split()
+                    return ' '.join(words[:max_words]) + ('...' if len(words) > max_words else '')
+
+
+                # Shorten long product names if they exceed a certain length
+                top_products_sorted['Product Name'] = top_products_sorted['Product Name'].apply(lambda x: truncate_product_name(x, max_words=2))
+
+
+                # Display the data in Streamlit with custom styling
+                st.markdown(
+                    """
+                    <style>
+                        .top-products-container {
+                            background-color: #0B1739;
+                            color: #D3D3D3;
+                            padding: 20px;
+                            height:150px;
+                            font-family: 'Montserrat', sans-serif;
+                        }
+                        .top-products-item {
+                            display: flex;
+                            align-items: center;
+                            #justify-content: space-between;
+                            margin-bottom: 10px;
+                        }
+                        .top-products-item i {
+                            margin-right: 10px; /* Space between icon and text */
+                            font-size: 14px;
+                            color: #00C2FF; /* Light blue color for icons */
+                        }    
+                        .top-products-item strong {
+                            color: #00C2FF;
+                            flex-grow: 1; /* Take up remaining space */
+                        }
+                        .top-products-item span {
+                            color: #00C2FF; /* Light blue color for percentages */
+                        }
+                    </style>
+                    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+                    <div class="top-products-container">
+                        <h3>Products</h3>
+                        
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+                # Generate the content for top products
+                content = ""
+                for _, row in top_products_sorted.iterrows():
+                    content += (
+                        f'<div class="top-products-item">'
+                        f'<i class="fas fa-box" style="margin-right: 2px; font-size: 14px;"></i>'  # Inline style for icon
+                        f'<strong>{row["Product Name"]}</strong>'
+                        f'<span>{row["Percentage"]}%</span>'
+                        f'</div>'
+                    )
+                # Inject the content into the markdown
+                st.markdown(f'<div class="top-products-container">{content}</div>', unsafe_allow_html=True)
+            with col[1]:
+                # Aggregate sales data by Segment and Month
+                # Define color mapping for segments
+                sales_data = filtered_df.groupby(['Segment', 'Month'], as_index=False)['Sales'].sum()
+                #segment_colors = {
+                    #'Segment1': '#CB3CFF',  # Change 'Segment1' to the actual name
+                    #'Segment2': '#0E43FB',  # Change 'Segment2' to the actual name
+                    #'Segment3': '#00C2FF'   # Change 'Segment3' to the actual name
+                #}
+                segment_colors = {
+                    'Consumer': '#CB3CFF',  # Segment 'Consumer' will be purple
+                    'Corporate': '#0E43FB',  # Segment 'Corporate' will be blue
+                    'Home Office': '#00C2FF'  # Segment 'Home Office' will be light blue
+
+                }
+        
+                # Create a bar chart
+                fig = go.Figure()
+                #print(sales_data['Segment'].unique())  # Check the segment names
+                # # Add bars for each segment
+                #for segment in sales_data['Segment'].unique():
+                #segment_data = sales_data[sales_data['Segment'] == segment]
+                #fig.add_trace(go.Bar(
+                #x=segment_data['Month'],
+                #y=segment_data['Sales'],
+                #name=segment,
+                #text=segment_data['Sales'].astype(str),
+                #textposition='outside',
+                #width=0.2 , # Thin bars
+                #marker=dict(color=color)  # Set the color explicitly using marker
+                #marker_color=segment_colors.get(segment)  # Assign color based on the segment
+                #))
+                for segment in sales_data['Segment'].unique():
+                    segment_data = sales_data[sales_data['Segment'] == segment]
+                    # Get the color for the current segment from the dictionary
+                    color = segment_colors.get(segment, '#FFFFFF')  # Use white as fallback if no match
+
+                    # Add bar trace for each segment
+                    fig.add_trace(go.Bar(
+                        x=segment_data['Month'],
+                        y=segment_data['Sales'],
+                        name=segment,
+                        text=segment_data['Sales'].astype(str),
+                        textposition='outside',
+                        width=0.1,
+                        marker=dict(color=color)  # Set the color explicitly using marker
+                    ))
+                    #Extra code end
+
+                    # Update the layout of the bar chart
+                    #extra 
+                    fig.update_layout(
+                        xaxis_title='Month',
+                        yaxis_title='Sales',
+                        barmode='stack',
+                        legend_title='Segment',
+                        height=400,
+                        margin=dict(l=50, r=10, t=30, b=30),
+                        xaxis=dict(
+                            tickvals=sales_data['Month'].unique(),
+                            ticktext=sales_data['Month'].unique(),
+                            showgrid=False
+                        ),
+                        yaxis=dict(
+                            showgrid=False
+                        ),
+                        bargap=0.1,
+                        plot_bgcolor='#0B1739',
+                        paper_bgcolor='#0B1739',
+                        font_color='white'
+                    )
+                # Display the chart in Streamlit
+                st.plotly_chart(fig, use_container_width=True)
+
+                #code for area graph
+                # Ensure no existing 'month_year' column
+                if 'month_year' in filtered_df.columns:
+                    filtered_df.drop(columns=['month_year'], inplace=True)
+                # Create new 'month_year' column
+                filtered_df["month_year"] = filtered_df["Order Date"].dt.to_period("M")
+
+                # Create a new dataframe with sum of Sales grouped by month
+                monthly_sales = filtered_df.groupby(filtered_df["month_year"].dt.strftime("%Y : %b")).agg({
+                    'Sales': 'sum'
+                }).reset_index()
+
+                # Create an area chart with sales by month
+                fig = px.area(monthly_sales,
+                    x="month_year",
+                    y="Sales",
+                    labels={"Sales": "Sales Amount"},
+                    template="gridon",  # You can change this to your desired template
+                    height=300,
+                    width=700)
+            
+                # Update layout
+                fig.update_layout(
+                
+                    margin=dict(t=20, b=10),  # Adjusting the top and bottom margins
+                    xaxis=dict(showgrid=False),  # Remove x-axis gridlines
+                    yaxis=dict(showgrid=False) ,  # Remove y-axis gridlines
+                    plot_bgcolor='#0B1739',  # Set the plot area background color
+                    paper_bgcolor='#0B1739'  # Set the paper (outer) background color
+                )
+                # Add transparency to the area fill
+                fig.update_traces(
+                    fillcolor='rgba(10, 37, 73, 0.4)'  # RGBA color with 30% opacity
+                )
+
+                # Add data labels to the chart
+                fig.update_traces(mode="lines+markers", textposition="top center")
+
+                # Show the plot with Streamlit
+                st.plotly_chart(fig, use_container_width=True)
+        
+            col=st.columns((5.5,2.5),gap='medium')
+            with col[0]:
+                # Prepare data for Prophet
+                forecast_df = filtered_df.groupby("Order Date").agg({"Sales": "sum"}).reset_index()
+                forecast_df.rename(columns={"Order Date": "ds", "Sales": "y"}, inplace=True)
+
+                #extra code 
+                # Split the data into training and validation sets
+                #train_size = int(len(forecast_df) * 0.8)  # Use 80% for training, 20% for testing        
+                #train = forecast_df[:train_size]
+                #test = forecast_df[train_size:]
+
+                #end of extra code 
+                # Fit the Prophet model
+                model = Prophet()
+                model.fit(forecast_df)
+                #extra code
+                #model.fit(train)
+                #extra code
+                # Make future dataframe for the test period
+                future = model.make_future_dataframe(periods=30)  # Match test period length
+                forecast = model.predict(future)
+                
+            
+                fig = go.Figure()
+
+                # Add actual sales line
+                
+                fig.add_trace(go.Scatter(x=forecast_df['ds'], y=forecast_df['y'], mode='lines', name='Actual Sales',
+                            line=dict(color='#0E43FB')))  # Actual Sales color
+
+                # Add predicted sales line
+                fig.add_trace(go.Scatter(x=forecast['ds'], y=forecast['yhat'], mode='lines', name='Predicted Sales',
+                            line=dict(color='#CB3CFF')))  # Predicted Sales color
+
+                # Add lower and upper confidence interval for forecast
+                fig.add_trace(go.Scatter(x=forecast['ds'], y=forecast['yhat_lower'], fill=None, mode='lines',
+                        line=dict(color='rgba(10, 37, 73, 0.4)'), showlegend=False, name='Lower Bound'))
+                fig.add_trace(go.Scatter(x=forecast['ds'], y=forecast['yhat_upper'], fill='tonexty', mode='lines',
+                        line=dict(color='rgba(10, 37, 73, 0.4)'), showlegend=False, name='Upper Bound'))
+
+                # Update layout
+                fig.update_layout(
+                    yaxis_title="Sales",
+                    yaxis=dict(
+                    showgrid=False  # Remove grid lines from x-axis
+                    ),
+                    template="plotly_white",
+                    height=580,
+                    paper_bgcolor="#0B1739",  # Dark background color
+                    plot_bgcolor="#0B1739",   # Dark background color for the plot area
+                    font=dict(color='#D3D3D3'),  # Light gray for text
+                    margin=dict(l=0, r=0, t=30, b=30)  # Adjust margins to reduce extra spacing
+                )
+
+                # Show plot in Streamlit
+                st.plotly_chart(fig, use_container_width=True)
+
+            with col[1]:
+                # Total Sales
+                total_sales = filtered_df['Sales'].sum()
+
+                # Predefined target scenarios
+                target_options = {
+                    "Previous Year's Sales": total_sales * 1.1,  # 10% increase
+                    "Quarterly Sales Target": total_sales * 1.2,  # 20% increase
+                    "Annual Sales Goal": total_sales * 1.5  # 50% increase
+                }
+                
+                # User selects a target scenario
+                selected_target = st.selectbox(
+                    "Select Target Scenario",
+                    options=list(target_options.keys())
+                )
+                # Get the target sales value based on the selected scenario
+                target_sales = target_options[selected_target]
+                # Calculate the progress
+                progress_percentage = (total_sales / target_sales) * 100
+                progress = min(progress_percentage, 100)
+                # Create the circular progress bar
+                bar_color = "#0E43FB" if progress_percentage <= 100 else "#FF0000"  # Red for overachievement
+            
+                fig = go.Figure(go.Indicator(
+                    mode="gauge+number",
+                    value=progress_percentage,
+                    gauge={
+                        #'axis': {'range': [0, max(100, progress_percentage)]},
+                        'axis': {'range': [0, 100], 'visible': False},
+                        #'bar': {'color': "rgba(14, 67, 251, 0.5)", 'line': {'color': 'rgba(0,0,0,0)', 'width': 0}},  # Add transparency to the bar color
+                        'bar': {'color': "#00C2FF", 'line': {'color': 'rgba(0,0,0,0)', 'width': 0}},  # Add transparency to the bar color
+                        'bgcolor': "#0B1739",
+                        'steps': [
+                            {'range': [0, 100], 'color': "#0B1739"}
+                        ]
+
+                    },
+                    title={'text': "Sales Target Completion", 'font': {'size': 24, 'color': "#D3D3D3"}},
+                    number={'suffix': "%", 'font': {'color': "#D3D3D3"}}
+                ))
+                # Update the layout for the chart
+                fig.update_layout(
+                    paper_bgcolor="#0B1739",
+                    font=dict(color='#D3D3D3'),
+                    #height=320,  # Adjust height
+                    #width=450,   # Adjust width
+                    margin=dict(l=10, r=10, t=10, b=10),
+                )
+                # Create a container with specific dimensions and background color
+                with st.container():  # Use st.container() for your layout needs
+                    st.markdown(
+                        """
+                        <div style="background-color: #0B1739; padding: 20px; display: flex; flex-direction: column;">
+                        """,
+                        unsafe_allow_html=True
+                    )
+
+                # Display the chart in Streamlit
+                st.plotly_chart(fig)
+                st.markdown(
+                    """
+                        </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+            st.markdown("<br>", unsafe_allow_html=True)
+            st.markdown("<br>", unsafe_allow_html=True)
+            
+
+        
+
+        
