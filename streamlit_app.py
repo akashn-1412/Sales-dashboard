@@ -47,15 +47,6 @@ if 'page' not in st.session_state:
     st.session_state.page = 'dashboard'  # Default to dashboard
 
 
-# Inject CSS to hide Streamlit's header, footer, and menu
-hide_st_style = """
-    <style>
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    header {visibility: hidden;}
-    </style>
-    """
-st.markdown(hide_st_style, unsafe_allow_html=True)
 
 
 
