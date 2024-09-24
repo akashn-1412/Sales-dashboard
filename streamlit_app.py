@@ -893,7 +893,16 @@ if fl is not None:
                 )
             st.markdown("<br>", unsafe_allow_html=True)
             st.markdown("<br>", unsafe_allow_html=True)
-            
+
+# Inject CSS to hide Streamlit's header, footer, and menu
+hide_st_style = """
+    <style>
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    </style>
+    """
+st.markdown(hide_st_style, unsafe_allow_html=True)
 
         
 
