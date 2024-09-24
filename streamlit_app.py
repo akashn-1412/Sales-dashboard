@@ -894,15 +894,18 @@ if fl is not None:
             st.markdown("<br>", unsafe_allow_html=True)
             st.markdown("<br>", unsafe_allow_html=True)
 
-# Inject CSS to hide Streamlit's header, footer, and menu
+# Inject CSS to hide Streamlit's header, footer, menu, and watermark
 hide_st_style = """
     <style>
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    header {visibility: hidden;}
+    #MainMenu {visibility: hidden;} /* Hide the hamburger menu */
+    footer {visibility: hidden;}    /* Hide the footer */
+    header {visibility: hidden;}    /* Hide the header */
+    .viewerBadge_container__1QSob {visibility: hidden;} /* Hide Streamlit watermark */
+    .stApp {margin-top: -50px;} /* Adjust margin to avoid blank space */
     </style>
     """
 st.markdown(hide_st_style, unsafe_allow_html=True)
+
 
         
 
