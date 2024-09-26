@@ -48,13 +48,14 @@ if 'page' not in st.session_state:
 
 
 
-
-
 #######################
 #for .stmetric background-color: #0B1739;
 #background-color: rgba(11, 23, 57, 0.4);
 # for datasets [stmetric] background-color: #393939;
 # CSS styling
+#CSS Styling to remove the streamlit icon by default 
+# Inject CSS to hide Streamlit's header, footer, and menu
+
 # Inject CSS into the Streamlit app for styling
 st.markdown("""
     <style>
@@ -190,19 +191,9 @@ def format_number(value):
 
 
 
-
 def parse_dates(df, date_column):
     date_formats = [
         #added more date format
-
-        #'%m-%d-%Y', '%d-%m-%Y', '%Y-%m-%d', '%d-%m-%y', '%m/%d/%Y',
-        #'%Y-%m-%d %H:%M:%S', '%d/%m/%Y %H:%M:%S', '%d-%m-%Y %H:%M:%S',
-        #'%d-%m-%Y', '%d/%m/%Y', '%Y/%m/%d',
-        #'%Y-%m-%dT%H:%M:%S', '%Y-%m-%dT%H:%M:%SZ',  # ISO 8601
-        #'%d %B %Y', '%d %b %Y',  # Full and abbreviated month names
-        #'%a, %d %b %Y',  # Weekday with date
-        #'%m-%d-%Y %I:%M %p', '%m/%d/%Y %I:%M %p'  # 12-hour format with AM/PM
-
         #changed some format
 
         '%d-%m-%Y', '%d/%m/%Y',  # Day-first formats
@@ -213,9 +204,6 @@ def parse_dates(df, date_column):
         '%a, %d %b %Y',  # Weekday with date
         '%m-%d-%Y %I:%M %p', '%m/%d/%Y %I:%M %p'  # 12-hour format with AM/PM
 
-
-
-
     ]
     
     for fmt in date_formats:
@@ -224,6 +212,8 @@ def parse_dates(df, date_column):
         except ValueError:
             continue
     return(None)
+
+
 
 st.sidebar.header(" :file_folder: Upload your datasets")
 fl = st.sidebar.file_uploader(" ", type=(["csv", "txt", "xlsx", "xls"]))
@@ -384,7 +374,7 @@ if fl is not None:
             else:
                 profit_margin_percentage = 0
 
-            #for kpi like 
+            #for kpi like
             # Calculate the number of unique customers
             total_customers = filtered_df["Customer Name"].nunique()
             # Calculate Order Frequency (Number of Orders / Total Customers)
@@ -767,65 +757,126 @@ if fl is not None:
                 # Show the plot with Streamlit
                 st.plotly_chart(fig, use_container_width=True)
         
-            col=st.columns((5.5,2.5),gap='medium')
-            with col[0]:
-                # Prepare data for Prophet
-                forecast_df = filtered_df.groupby("Order Date").agg({"Sales": "sum"}).reset_index()
-                forecast_df.rename(columns={"Order Date": "ds", "Sales": "y"}, inplace=True)
-
-                #extra code 
-                # Split the data into training and validation sets
-                #train_size = int(len(forecast_df) * 0.8)  # Use 80% for training, 20% for testing        
-                #train = forecast_df[:train_size]
-                #test = forecast_df[train_size:]
-
-                #end of extra code 
-                # Fit the Prophet model
-                model = Prophet()
-                model.fit(forecast_df)
-                #extra code
-                #model.fit(train)
-                #extra code
-                # Make future dataframe for the test period
-                future = model.make_future_dataframe(periods=30)  # Match test period length
-                forecast = model.predict(future)
+            col_1,col_2=st.columns((5.5,2.5),gap='medium')
+            #col=st.columns((3,5),gap='medium')
+            with col_1:
+                # Step 2: Detect a potential sales-related column
+                sales_column = None
+                for col in df.columns:
+                    if "sales" in col.lower():
+                        sales_column = col
+                        break
+                # If no explicit sales column is found, select the first numeric column
+                if sales_column is None:
+                    numeric_columns = df.select_dtypes(include=[np.number]).columns
+                    if len(numeric_columns) > 0:
+                        sales_column = numeric_columns[0]  # Select the first numeric column
+                    else:
+                        st.error("No sales or numeric column found in the dataset.")
+                        st.stop()
                 
-            
+                # Step 3: Automatically detect date column or create one
+                date_column = None
+                for col in df.columns:
+                    if "date" in col.lower() or "time" in col.lower():
+                        date_column = col
+                        break
+                # If no date column is found, create a sequential date range
+                if date_column is None:
+                    st.warning("No date column found. Generating a daily time index.")
+                    df['Order Date'] = pd.date_range(start='2020-01-01', periods=len(df), freq='D')
+                    date_column = 'Order Date'
+                # Step 4: Prepare the data for Prophet
+                df[date_column] = pd.to_datetime(df[date_column], errors='coerce')
+                df = df.dropna(subset=[date_column, sales_column])  # Drop invalid rows
+
+
+                # Step 5: Resample data to monthly level
+                #monthly_sales = df.set_index(date_column).resample('M')[sales_column].sum().reset_index()
+                monthly_sales = df.set_index(date_column).resample('M').sum().reset_index()
+
+                monthly_sales.rename(columns={date_column: 'ds', sales_column: 'y'}, inplace=True)
+
+                # Ensure there's enough data for forecasting
+                if len(monthly_sales) < 2:
+                    st.error("Not enough data for monthly forecasting. Please upload a larger dataset.")
+                    st.stop()
+                # Allow user to select the train/test split ratio
+                split_ratio = st.sidebar.slider("Select Training Data Percentage", min_value=0.5, max_value=0.9, value=0.8)
+                
+
+                # Step 6: Split data into training and testing sets based on user input
+                train_size = int(len(monthly_sales) * split_ratio)
+                train = monthly_sales[:train_size]
+                test = monthly_sales[train_size:]
+
+                # Step 7: Fit the Prophet model on training data
+                # Adding holiday effects (customize as needed)
+                
+
+                model = Prophet()
+                model.fit(train)
+
+                
+
+
+
+                # Step 8: Make future dataframe for forecasting based on the test period
+                #future = model.make_future_dataframe(periods=len(test), freq='M')
+                future = model.make_future_dataframe(periods=len(test), freq='M')
+
+                forecast = model.predict(future)
+
+                # Step 9: Calculate accuracy metrics
+                y_true = test['y'].values
+                #y_pred = forecast['yhat'].iloc[train_size:].values  # Get the corresponding predictions
+                y_pred = forecast['yhat'].iloc[train_size:].values
+
+                
+
+                # Calculate MAE and MAPE
+                mae = mean_absolute_error(y_true, y_pred)
+                mape = mean_absolute_percentage_error(y_true, y_pred) * 100  # Convert to percentage
+                accuracy = 100 - mape
                 fig = go.Figure()
 
-                # Add actual sales line
-                
-                fig.add_trace(go.Scatter(x=forecast_df['ds'], y=forecast_df['y'], mode='lines', name='Actual Sales',
+
+                # Add actual sales line (monthly)
+                fig.add_trace(go.Scatter(x=monthly_sales['ds'], y=monthly_sales['y'], mode='lines', name='Actual Sales',
                             line=dict(color='#0E43FB')))  # Actual Sales color
 
-                # Add predicted sales line
+                # Add predicted sales line (monthly)
                 fig.add_trace(go.Scatter(x=forecast['ds'], y=forecast['yhat'], mode='lines', name='Predicted Sales',
                             line=dict(color='#CB3CFF')))  # Predicted Sales color
 
-                # Add lower and upper confidence interval for forecast
-                fig.add_trace(go.Scatter(x=forecast['ds'], y=forecast['yhat_lower'], fill=None, mode='lines',
-                        line=dict(color='rgba(10, 37, 73, 0.4)'), showlegend=False, name='Lower Bound'))
-                fig.add_trace(go.Scatter(x=forecast['ds'], y=forecast['yhat_upper'], fill='tonexty', mode='lines',
-                        line=dict(color='rgba(10, 37, 73, 0.4)'), showlegend=False, name='Upper Bound'))
 
-                # Update layout
+                # Add lower and upper confidence intervals
+                fig.add_trace(go.Scatter(x=forecast['ds'], y=forecast['yhat_lower'], fill=None, mode='lines',
+                            line=dict(color='rgba(10, 37, 73, 0.4)'), showlegend=False, name='Lower Bound'))
+                fig.add_trace(go.Scatter(x=forecast['ds'], y=forecast['yhat_upper'], fill='tonexty', mode='lines',
+                            line=dict(color='rgba(10, 37, 73, 0.4)'), showlegend=False, name='Upper Bound'))
+
+                # Step 1
+                # 
+                #1: Update layout and display the chart
                 fig.update_layout(
-                    yaxis_title="Sales",
-                    yaxis=dict(
-                    showgrid=False  # Remove grid lines from x-axis
-                    ),
-                    template="plotly_white",
-                    height=580,
-                    paper_bgcolor="#0B1739",  # Dark background color
-                    plot_bgcolor="#0B1739",   # Dark background color for the plot area
-                    font=dict(color='#D3D3D3'),  # Light gray for text
-                    margin=dict(l=0, r=0, t=30, b=30)  # Adjust margins to reduce extra spacing
+                        yaxis_title="Sales",
+                        xaxis_title="Date",
+                        yaxis=dict(showgrid=False),
+                        template="plotly_white",
+                        height=580,
+                        
+                        paper_bgcolor="#0B1739",  # Dark background color
+                        plot_bgcolor="#0B1739",  # Dark background color for the plot area
+                        font=dict(color='#D3D3D3'),  # Light gray for text
+                        #margin=dict(l=
+                        #0, r=0, t=30, b=30)  # Adjust margins to reduce extra spacing
                 )
 
                 # Show plot in Streamlit
                 st.plotly_chart(fig, use_container_width=True)
-
-            with col[1]:
+                
+            with col_2:
                 # Total Sales
                 total_sales = filtered_df['Sales'].sum()
 
@@ -893,19 +944,7 @@ if fl is not None:
                 )
             st.markdown("<br>", unsafe_allow_html=True)
             st.markdown("<br>", unsafe_allow_html=True)
-
-# Inject CSS to hide Streamlit's header, footer, menu, and watermark
-hide_st_style = """
-    <style>
-    #MainMenu {visibility: hidden;} /* Hide the hamburger menu */
-    footer {visibility: hidden;}    /* Hide the footer */
-    header {visibility: hidden;}    /* Hide the header */
-    .viewerBadge_container__1QSob {visibility: hidden;} /* Hide Streamlit watermark */
-    .stApp {margin-top: -50px;} /* Adjust margin to avoid blank space */
-    </style>
-    """
-st.markdown(hide_st_style, unsafe_allow_html=True)
-
+            
 
         
 
